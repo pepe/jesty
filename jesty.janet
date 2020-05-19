@@ -28,7 +28,15 @@
   (array/remove commands 0)
   (while (not (empty? commands))
     (def next-req (find-index |(= :request $) commands))
-    (array/push res (array/slice commands 0 next-req))
+    (def a (reverse (array/slice commands 0 next-req)))
+    (def req @{:headers @[]})
+    (while (not (empty? a))
+      (def n (array/pop a))
+      (def v (array/pop a))
+      (if (= :header n)
+        (update req :headers |(array/push $ v))
+        (put req n v)))
+    (array/push res req)
     (array/remove commands 0 (if next-req (inc next-req) (length commands))))
   res)
 
@@ -37,4 +45,4 @@
   (def requests (parse-requests src))
   (if i
     (print (get-in requests [(scan-number i) 1]))
-    (each r requests (print (r 1)))))
+    (each r requests (tracev r))))

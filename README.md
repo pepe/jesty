@@ -42,4 +42,4 @@ REST client based on text files, simillar to one I was used to use in emacs.
 #### Implementation
 
 Simple CLI.
-PEG for the file
+PEG for the file.

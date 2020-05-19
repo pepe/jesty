@@ -1,0 +1,19 @@
+# get all accounts
+GET http://backend.mytrees:3030/accounts/
+Authorization: Bearer adcdshclgndslfhbvhfkjjanv
+Content-Type: application/json
+
+# get account by id
+GET http://backend.mytrees:3030/accounts/
+Authorization: Bearer adcdshclgndslfhbvhfkjjanv
+
+# create new account
+POST http://backend.mytrees:3030/accounts/
+Content-Type: application/json
+
+{"name": "hohoho"}
+
+# find account by email
+GET http://backend.mytrees:3030/accounts/?email=jo@po.co
+Authorization: Bearer adcdshclgndslfhbvhfkjjanv
+Content-Type: application/json

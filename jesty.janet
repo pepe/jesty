@@ -1,17 +1,25 @@
 (import uri)
 (import curl)
 
+(defn render-url [r]
+  (def url (r :url))
+  (string (url :scheme) "://" (url :host) ":" (url :port) (url :path) "?" (url :raw-query)))
 (defn fetch
   "Simple url fetch. Returns string with the content of the resource."
-  [url]
-  (let [c (curl/easy/init)
-        b (buffer)]
-    (:setopt c
-             :url url
-             :write-function (fn [buf] (buffer/push-string b buf))
-             :no-progress? true)
-    (:perform c)
-    b))
+  [request]
+  (def c (curl/easy/init))
+  (def b (buffer))
+  (:setopt c
+           :url (render-url request)
+           :write-function (fn [buf] (buffer/push-string b buf))
+           :no-progress? true)
+  (when-let [headers (request :headers)]
+    (:setopt c :http-header headers))
+  (case (request :method)
+    "POST" (:setopt c :post? true)
+    "PATCH" (:setopt c :custom-request "PATCH"))
+  (:perform c)
+  b)
 
 (def g
   {:title ~(* (constant :title) (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n")
@@ -44,5 +52,8 @@
   (def src (slurp file))
   (def requests (parse-requests src))
   (if i
-    (print (get-in requests [(scan-number i) 1]))
-    (each r requests (tracev r))))
+    (let [r (requests (scan-number i))]
+      (tracev (fetch r)))
+
+    (each r requests
+      (print (fetch r)))))

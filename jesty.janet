@@ -1,9 +1,11 @@
 (import uri)
 (import curl)
+(import json)
 
 (defn render-url [r]
   (def url (r :url))
   (string (url :scheme) "://" (url :host) ":" (url :port) (url :path) "?" (url :raw-query)))
+
 (defn fetch
   "Simple url fetch. Returns string with the content of the resource."
   [request]
@@ -16,14 +18,20 @@
   (when-let [headers (request :headers)]
     (:setopt c :http-header headers))
   (case (request :method)
-    "POST" (:setopt c :post? true)
-    "PATCH" (:setopt c :custom-request "PATCH"))
+    "POST" (:setopt c
+                    :post? true
+                    :post-fields (request :body)
+                    :post-field-size (length (request :body)))
+    "PATCH" (:setopt c
+                     :custom-request "PATCH"
+                     :post-fields (request :body)
+                     :post-field-size (length (request :body))))
   (:perform c)
   b)
 
-(def g
+(def request-grammar
   {:title ~(* (constant :title) (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n")
-   :method '(* (constant :method) '(+ "GET" "POST"))
+   :method '(* (constant :method) '(+ "GET" "POST" "PATCH"))
    :command ~(* :method " " (* (constant :url) (cmt '(some (if-not "\n" 1)) ,uri/parse)) "\n")
    :header '(* (constant :header) '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n")
    :body '(* "\n" (not "#") (* (constant :body) '(some (if-not (+ (* "\n#") -1) 1))))
@@ -31,7 +39,7 @@
    :main '(some :request)})
 
 (defn parse-requests [src]
-  (def commands (peg/match g src))
+  (def commands (peg/match request-grammar src))
   (def res @[])
   (array/remove commands 0)
   (while (not (empty? commands))
@@ -53,7 +61,6 @@
   (def requests (parse-requests src))
   (if i
     (let [r (requests (scan-number i))]
-      (tracev (fetch r)))
-
+      (tracev (json/decode (fetch r) true)))
     (each r requests
-      (print (fetch r)))))
+      (tracev (fetch r)))))

@@ -30,17 +30,31 @@
   b)
 
 (def request-grammar
-  {:title ~(* (constant :title) (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n")
+  {:assigment '(* (constant :assigment) (* '(some :S) " " '(some (if-not "\n" 1)) "\n"))
+   :definitions '(* "# definitions\n" (some :assigment) (? "\n"))
+   :title ~(* (constant :title) (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n")
    :method '(* (constant :method) '(+ "GET" "POST" "PATCH"))
    :command ~(* :method " " (* (constant :url) (cmt '(some (if-not "\n" 1)) ,uri/parse)) "\n")
    :header '(* (constant :header) '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n")
    :body '(* "\n" (not "#") (* (constant :body) '(some (if-not (+ (* "\n#") -1) 1))))
    :request '(* (constant :request) :title :command (any :header) (any :body))
-   :main '(some :request)})
+   :main '(* (? :definitions) (some :request))})
+
+(defn index-in [v xs]
+  (find-index |(= v $) xs))
 
 (defn parse-requests [src]
   (def commands (peg/match request-grammar src))
+  (def defs @{})
   (def res @[])
+  (when (= :assigment (commands 0))
+    (def next-req (index-in :request commands))
+    (def d (array/slice commands next-req))
+    (array/remove commands 0 (inc next-req))
+    (while (not (empty? d))
+      (array/remove d 0)
+      (def next-assigment (index-in :assigment d))
+      (put defs (array/pop d) (array/pop d))))
   (array/remove commands 0)
   (while (not (empty? commands))
     (def next-req (find-index |(= :request $) commands))
@@ -63,4 +77,4 @@
     (let [r (requests (scan-number i))]
       (tracev (json/decode (fetch r) true)))
     (each r requests
-      (tracev (fetch r)))))
+      (tracev r))))

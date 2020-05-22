@@ -29,15 +29,18 @@
   (:perform c)
   b)
 
+(defn pnode [tag] (fn [& x] [tag ;x]))
+
 (def request-grammar
-  {:assigment '(* (constant :assigment) (* '(some :S) " " '(some (if-not "\n" 1)) "\n"))
-   :definitions '(* "# definitions\n" (some :assigment) (? "\n"))
-   :title ~(* (constant :title) (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n")
-   :method '(* (constant :method) '(+ "GET" "POST" "PATCH"))
-   :command ~(* :method " " (* (constant :url) (cmt '(some (if-not "\n" 1)) ,uri/parse)) "\n")
-   :header '(* (constant :header) '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n")
-   :body '(* "\n" (not "#") (* (constant :body) '(some (if-not (+ (* "\n#") -1) 1))))
-   :request '(* (constant :request) :title :command (any :header) (any :body))
+  {:assigment ~(/ (* (* '(some :S) " " '(some (if-not "\n" 1)) "\n")) ,(pnode :assigment))
+   :definitions ~(/ (* "# definitions\n" (some :assigment) (? "\n")) ,(pnode :definitions))
+   :title ~(/ (* (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n") ,(pnode :title))
+   :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
+   :url ~(/ (* (cmt '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
+   :command ~(/ (* :method " " :url "\n") ,(pnode :command))
+   :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n") ,(pnode :header))
+   :body ~(/ (* "\n" (not "#") (* '(some (if-not (+ (* "\n#") -1) 1)))) ,(pnode :body))
+   :request ~(/ (* :title :command (any :header) (any :body)) ,(pnode :request))
    :main '(* (? :definitions) (some :request))})
 
 (defn index-in [v xs]

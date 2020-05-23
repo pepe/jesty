@@ -29,55 +29,41 @@
   (:perform c)
   b)
 
-(defn pnode [tag] (fn [& x] [tag ;x]))
+(defn collect-headers [x]
+  (map |($ :header) (filter |($ :header) x)))
+
+(defn pdefs []
+  (fn [& x] {:definitions (collect-headers x)}))
+
+(defn preq []
+  (fn [& x]
+    (put (merge {:headers (collect-headers x)} ;x) :header nil)))
+
+(defn preqs [] (fn [& x] {:requests x}))
+
+(defn pnode [tag]
+  (fn [& x] {tag ;x}))
+
 
 (def request-grammar
-  {:assigment ~(/ (* (* '(some :S) " " '(some (if-not "\n" 1)) "\n")) ,(pnode :assigment))
-   :definitions ~(/ (* "# definitions\n" (some :assigment) (? "\n")) ,(pnode :definitions))
+  {:definitions ~(/ (* "# definitions\n" (some :header) (? "\n")) ,(pdefs))
    :title ~(/ (* (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n") ,(pnode :title))
    :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
    :url ~(/ (* (cmt '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
-   :command ~(/ (* :method " " :url "\n") ,(pnode :command))
+   :command '(* :method " " :url "\n")
    :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n") ,(pnode :header))
    :body ~(/ (* "\n" (not "#") (* '(some (if-not (+ (* "\n#") -1) 1)))) ,(pnode :body))
-   :request ~(/ (* :title :command (any :header) (any :body)) ,(pnode :request))
-   :main '(* (? :definitions) (some :request))})
-
-(defn index-in [v xs]
-  (find-index |(= v $) xs))
+   :request ~(/ (* :title :command (any :header) (any :body)) ,(preq))
+   :main ~(* (? :definitions) (/ (some :request) ,(preqs)))})
 
 (defn parse-requests [src]
-  (def commands (peg/match request-grammar src))
-  (def defs @{})
-  (def res @[])
-  (when (= :assigment (commands 0))
-    (def next-req (index-in :request commands))
-    (def d (array/slice commands next-req))
-    (array/remove commands 0 (inc next-req))
-    (while (not (empty? d))
-      (array/remove d 0)
-      (def next-assigment (index-in :assigment d))
-      (put defs (array/pop d) (array/pop d))))
-  (array/remove commands 0)
-  (while (not (empty? commands))
-    (def next-req (find-index |(= :request $) commands))
-    (def a (reverse (array/slice commands 0 next-req)))
-    (def req @{:headers @[]})
-    (while (not (empty? a))
-      (def n (array/pop a))
-      (def v (array/pop a))
-      (if (= :header n)
-        (update req :headers |(array/push $ v))
-        (put req n v)))
-    (array/push res req)
-    (array/remove commands 0 (if next-req (inc next-req) (length commands))))
-  res)
+  (def p (merge ;(peg/match request-grammar src)))
+  (map |(update $ :headers array/concat (p :definitions))
+       (p :requests)))
 
 (defn main [_ file &opt i]
   (def src (slurp file))
   (def requests (parse-requests src))
-  (if i
-    (let [r (requests (scan-number i))]
-      (tracev (json/decode (fetch r) true)))
-    (each r requests
-      (tracev r))))
+  (if-let [i (scan-number i)]
+    (tracev (fetch (requests i)))
+    (tracev requests)))

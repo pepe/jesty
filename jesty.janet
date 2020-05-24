@@ -32,8 +32,7 @@
 (defn collect-headers [x]
   (map |($ :header) (filter |($ :header) x)))
 
-(defn pdefs []
-  (fn [& x] {:definitions (collect-headers x)}))
+(defn pdefs [& x] {:definitions (collect-headers x)})
 
 (defn preq []
   (fn [& x]
@@ -44,12 +43,15 @@
 (defn pnode [tag]
   (fn [& x] {tag ;x}))
 
+(var l 0)
+(defn eol [& x] (++ l))
 
 (def request-grammar
-  {:definitions ~(/ (* "# definitions\n" (some :header) (? "\n")) ,(pdefs))
+  {:eol ~(cmt "\n" ,eol)
+   ':definitions ~(/ (* "# definitions" :eol (some :header) (? "\n")) ,pdefs)
    :title ~(/ (* (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n") ,(pnode :title))
    :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
-   :url ~(/ (* (cmt '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
+   :url ~(/ (* (/ '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
    :command '(* :method " " :url "\n")
    :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n") ,(pnode :header))
    :body ~(/ (* "\n" (not "#") (* '(some (if-not (+ (* "\n#") -1) 1)))) ,(pnode :body))
@@ -58,6 +60,7 @@
 
 (defn parse-requests [src]
   (def p (merge ;(peg/match request-grammar src)))
+  (tracev p)
   (map |(update $ :headers array/concat (p :definitions))
        (p :requests)))
 

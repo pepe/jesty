@@ -8,10 +8,13 @@
   (def c (curl/easy/init))
   (def b (buffer))
   (def url (request :url))
+  (def u (string (url :scheme) "://" (url :host) ":" (url :port)
+                 (url :path)
+                 (if (url :query) (string "?" (url :raw-query)) "")))
+  (print u)
 
   (:setopt c
-           :url (string (url :scheme) "://" (url :host) ":" (url :port)
-                        (url :path) "?" (url :raw-query))
+           :url u
            :write-function (fn [buf] (buffer/push-string b buf))
            :no-progress? true)
   (when-let [headers (request :headers)]
@@ -75,5 +78,5 @@
   (def requests (parse-requests src))
 
   (if-let [i (and i (scan-number i))]
-    (tracev (find |(<= ($ :start) i ($ :end)) requests))
+    (print (fetch (find |(<= ($ :start) i ($ :end)) requests)))
     (loop [r :in requests] (print (r :title)))))

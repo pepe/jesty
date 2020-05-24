@@ -2,7 +2,6 @@
 (import curl)
 (import json)
 
-
 (defn fetch
   "Simple url fetch. Returns string with the content of the resource."
   [request]
@@ -34,16 +33,17 @@
 (defn parse-requests [src]
   (var l 1)
   (var ll l)
+
   (defn eol [& _] (++ l))
 
   (defn collect-headers [x]
-    (->> x
-         (filter |($ :header))
-         (map |($ :header))))
+    (seq [i :in x
+          :when (i :header)]
+      (i :header)))
 
   (defn pdefs [& x]
     (set ll l)
-    {:definitions (collect-headers x)})
+    (collect-headers x))
 
   (defn preq []
     (fn [& x]
@@ -52,8 +52,6 @@
                      :start ll :end (dec l)} ;x) :header nil))
       (set ll l)
       res))
-
-  (defn preqs [& x] {:requests x})
 
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
@@ -67,11 +65,10 @@
      :command '(* :method " " :url :eol)
      :body ~(/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) 1)) :eol)) ,(pnode :body))
      :request ~(/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
-     :main ~(* (? :definitions) (/ (some :request) ,preqs))})
+     :main ~(* (? :definitions) (/ (some :request) ,tuple))})
 
-  (def p (merge ;(peg/match request-grammar src)))
-  (map |(update $ :headers array/concat (p :definitions))
-       (p :requests)))
+  (def [defs reqs] (peg/match request-grammar src))
+  (map |(update $ :headers array/concat defs) reqs))
 
 (defn main [_ file &opt i]
   (def src (slurp file))

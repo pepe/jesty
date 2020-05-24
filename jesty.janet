@@ -26,47 +26,65 @@
                      :custom-request "PATCH"
                      :post-fields (request :body)
                      :post-field-size (length (request :body))))
-  (:perform c)
+  (def res (:perform c))
+  (when (not (zero? res))
+    (error (string "Cannot fetch: " (curl/easy/strerror res))))
   b)
 
-(defn collect-headers [x]
-  (map |($ :header) (filter |($ :header) x)))
+(var l 1)
+(var ll l)
+(defn eol [& x] (++ l))
 
-(defn pdefs [& x] {:definitions (collect-headers x)})
+(defn collect-headers [x]
+  (->> x
+       (filter |($ :header))
+       (map |($ :header))))
+
+(defn pdefs [& x]
+  (set ll l)
+  {:definitions (collect-headers x)})
 
 (defn preq []
   (fn [& x]
-    (put (merge {:headers (collect-headers x)} ;x) :header nil)))
+    (def res
+      (put (merge {:headers (collect-headers x)
+                   :start ll :end (dec l)} ;x) :header nil))
+    (set ll l)
+    res))
 
-(defn preqs [] (fn [& x] {:requests x}))
+(defn preqs [& x] {:requests x})
 
-(defn pnode [tag]
-  (fn [& x] {tag ;x}))
-
-(var l 0)
-(defn eol [& x] (++ l))
+(defn pnode [tag] (fn [& x] {tag ;x}))
 
 (def request-grammar
-  {:eol ~(cmt "\n" ,eol)
-   ':definitions ~(/ (* "# definitions" :eol (some :header) (? "\n")) ,pdefs)
-   :title ~(/ (* (? "\n") "#" (cmt '(some (if-not "\n" 1)) ,string/trim) "\n") ,(pnode :title))
+  {:eol ~(drop (cmt '"\n" ,eol))
+   :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) :eol) ,(pnode :header))
+   :definitions ~(/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
+   :title ~(/ (* "#" (/ '(some (if-not "\n" 1)) ,string/trim) :eol) ,(pnode :title))
    :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
    :url ~(/ (* (/ '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
-   :command '(* :method " " :url "\n")
-   :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) "\n") ,(pnode :header))
-   :body ~(/ (* "\n" (not "#") (* '(some (if-not (+ (* "\n#") -1) 1)))) ,(pnode :body))
-   :request ~(/ (* :title :command (any :header) (any :body)) ,(preq))
-   :main ~(* (? :definitions) (/ (some :request) ,(preqs)))})
+   :command '(* :method " " :url :eol)
+   :body ~(/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) 1)) :eol)) ,(pnode :body))
+   :request ~(/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
+   :main ~(* (? :definitions) (/ (some :request) ,preqs))})
 
 (defn parse-requests [src]
   (def p (merge ;(peg/match request-grammar src)))
-  (tracev p)
   (map |(update $ :headers array/concat (p :definitions))
        (p :requests)))
+
+(defn by-line [i rs]
+  (var res nil)
+  (loop [r :in rs]
+    (if (< (r :start) i)
+      (set res r)
+      (break)))
+  res)
 
 (defn main [_ file &opt i]
   (def src (slurp file))
   (def requests (parse-requests src))
-  (if-let [i (scan-number i)]
-    (tracev (fetch (requests i)))
-    (tracev requests)))
+
+  (if-let [i (and i (scan-number i))]
+    (print (fetch (by-line i requests)))
+    (loop [r :in requests] (print (r :title)))))

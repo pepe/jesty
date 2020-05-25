@@ -103,7 +103,8 @@
     [:array d] (print-array)
     (print "null")))
 
-(defn main [_ file &opt i]
+(defn main [_ file &opt i format]
+  (default format "json")
   (def src (slurp file))
   (def requests (parse-requests src))
 
@@ -112,5 +113,7 @@
       (def res (->> requests
                     (find |(<= ($ :start) i ($ :end)))
                     (fetch)))
-      (print-data (json/decode res false true)))
+      (if (= format "pretty")
+        (print-data (json/decode res false true))
+        (print res)))
     (loop [r :in requests] (print (r :title)))))

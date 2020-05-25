@@ -1,4 +1,3 @@
-(import uri)
 (import curl)
 (import json)
 (import utf8)
@@ -9,11 +8,8 @@
   (def c (curl/easy/init))
   (def b (buffer))
   (def url (request :url))
-  (def u (string (url :scheme) "://" (url :host) ":" (url :port)
-                 (url :path)
-                 (if (url :query) (string "?" (url :raw-query)) "")))
   (:setopt c
-           :url u
+           :url url
            :write-function (fn [buf] (buffer/push-string b buf))
            :no-progress? true)
   (when-let [headers (request :headers)]
@@ -63,9 +59,9 @@
      :definitions ~(/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
      :title ~(/ (* "#" (/ '(some (if-not "\n" 1)) ,string/trim) :eol) ,(pnode :title))
      :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
-     :url ~(/ (* (/ '(some (if-not "\n" 1)) ,uri/parse)) ,(pnode :url))
+     :url ~(/ (* '(some (if-not "\n" 1))) ,(pnode :url))
      :command '(* :method " " :url :eol)
-     :body ~(/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) 1)) :eol)) ,(pnode :body))
+     :body ~(/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol)) ,(pnode :body))
      :request ~(/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
      :main ~(* (? :definitions) (/ (some :request) ,tuple))})
 
@@ -114,4 +110,4 @@
       (if (= format "pretty")
         (print-data (json/decode res false true))
         (print res)))
-    (loop [r :in requests] (print (r :title)))))
+    (loop [r :in requests] (tracev r))))

@@ -1,6 +1,7 @@
 (import uri)
 (import curl)
 (import json)
+(import utf8)
 
 (defn fetch
   "Simple url fetch. Returns string with the content of the resource."
@@ -73,10 +74,48 @@
   (def [defs reqs] (peg/match request-grammar src))
   (map |(update $ :headers array/concat defs) reqs))
 
+(defn print-data [data &opt ind]
+  (default ind 0)
+  (defn indent [] (for i 0 ind (prin " ")))
+  (if (number? data)
+    (print data)
+    (match [(type data) (empty? data)]
+      [:string false] (print data)
+      [:string true] (print "\"\"")
+      [:table true] (print "{}")
+      [:table false]
+      (do
+        (when (> ind 1) (print))
+        (indent)
+        (print "{")
+        (eachk k data
+          (indent)
+          (prin "\"" k "\": ")
+          (print-data (data k) (+ 2 ind)))
+        (indent)
+        (print "}"))
+      [:array true] (print "[]")
+      [:array false]
+      (do
+        (print)
+        (indent)
+        (print "[")
+        (each v data
+          (indent)
+          (print-data v (+ 2 ind)))
+        (indent)
+        (print "]"))
+      (print "null"))))
+
 (defn main [_ file &opt i]
   (def src (slurp file))
   (def requests (parse-requests src))
 
   (if-let [i (and i (scan-number i))]
-    (print (fetch (find |(<= ($ :start) i ($ :end)) requests)))
+    (do
+      (def res (->> requests
+                    (find |(<= ($ :start) i ($ :end)))
+                    (fetch)))
+      (def data (if-let [{"data" data} (json/decode res false true)] data res))
+      (print-data data))
     (loop [r :in requests] (print (r :title)))))

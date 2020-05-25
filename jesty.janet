@@ -112,6 +112,5 @@
       (def res (->> requests
                     (find |(<= ($ :start) i ($ :end)))
                     (fetch)))
-      (def data (if-let [{"data" data} (json/decode res false true)] data res))
-      (print-data data))
+      (print-data (json/decode res false true)))
     (loop [r :in requests] (print (r :title)))))

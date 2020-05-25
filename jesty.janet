@@ -76,8 +76,8 @@
 
 (defn print-data [data &opt ind]
   (default ind 0)
-  (defn indent [] (for i 0 ind (prin " ")))
-  (if (number? data)
+  (defn indent [] (when (pos? ind) (string/repeat " " ind)))
+  (if (or (number? data) (boolean? data))
     (print data)
     (match [(type data) (empty? data)]
       [:string false] (print data)

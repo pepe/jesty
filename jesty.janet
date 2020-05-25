@@ -12,8 +12,6 @@
   (def u (string (url :scheme) "://" (url :host) ":" (url :port)
                  (url :path)
                  (if (url :query) (string "?" (url :raw-query)) "")))
-  (print (request :method) " " u)
-
   (:setopt c
            :url u
            :write-function (fn [buf] (buffer/push-string b buf))

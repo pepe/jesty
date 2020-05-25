@@ -12,7 +12,7 @@
   (def u (string (url :scheme) "://" (url :host) ":" (url :port)
                  (url :path)
                  (if (url :query) (string "?" (url :raw-query)) "")))
-  (print u)
+  (print (request :method) " " u)
 
   (:setopt c
            :url u
@@ -76,36 +76,32 @@
 
 (defn print-data [data &opt ind]
   (default ind 0)
-  (defn indent [] (when (pos? ind) (string/repeat " " ind)))
-  (if (or (number? data) (boolean? data))
-    (print data)
-    (match [(type data) (empty? data)]
-      [:string false] (print data)
-      [:string true] (print "\"\"")
-      [:table true] (print "{}")
-      [:table false]
-      (do
-        (when (> ind 1) (print))
-        (indent)
-        (print "{")
-        (eachk k data
-          (indent)
-          (prin "\"" k "\": ")
-          (print-data (data k) (+ 2 ind)))
-        (indent)
-        (print "}"))
-      [:array true] (print "[]")
-      [:array false]
-      (do
-        (print)
-        (indent)
-        (print "[")
-        (each v data
-          (indent)
-          (print-data v (+ 2 ind)))
-        (indent)
-        (print "]"))
-      (print "null"))))
+  (defn indent [] (when (pos? ind) (prin (string/repeat " " ind))))
+  (defn print-table []
+    (when (> ind 1) (print))
+    (indent) (print "{")
+    (eachp [k v] data
+      (indent)
+      (prin "\"" k "\": ")
+      (print-data v (+ 2 ind)))
+    (indent) (print "}"))
+  (defn print-array []
+    (print) (indent) (print "[")
+    (each v data
+      (indent)
+      (print-data v (+ 2 ind)))
+    (indent) (print "]"))
+  (match [(type data) data]
+    [:boolean d] (print d)
+    [:number d] (print d)
+    [:string (d (empty? d))] (print "\"\"")
+    [:string (d (> (length d) 30))] (print (string/slice data 0 30) "...")
+    [:string d] (print d)
+    [:table (d (empty? d))] (print "{}")
+    [:table d] (print-table)
+    [:array (d (empty? d))] (print "[]")
+    [:array d] (print-array)
+    (print "null")))
 
 (defn main [_ file &opt i]
   (def src (slurp file))

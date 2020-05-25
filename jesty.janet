@@ -97,9 +97,9 @@
     [:array d] (print-array)
     (print "null")))
 
-(defn main [_ file &opt i format]
+(defn main [_ &opt i format]
   (default format "json")
-  (def src (slurp file))
+  (def src (:read stdin :all))
   (def requests (parse-requests src))
 
   (if-let [i (and i (scan-number i))]

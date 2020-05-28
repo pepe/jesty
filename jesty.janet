@@ -22,7 +22,8 @@
     "PATCH" (:setopt c
                      :custom-request "PATCH"
                      :post-fields (request :body)
-                     :post-field-size (length (request :body))))
+                     :post-field-size (length (request :body)))
+    "DELETE" (:setopt c :custom-request "DELETE"))
   (def res (:perform c))
   (when (not (zero? res))
     (error (string "Cannot fetch: " (curl/easy/strerror res))))
@@ -58,7 +59,7 @@
      :header ~(/ (* '(* (some (+ :w "-")) ": " (some (if-not "\n" 1))) :eol) ,(pnode :header))
      :definitions ~(/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
      :title ~(/ (* "#" (/ '(some (if-not "\n" 1)) ,string/trim) :eol) ,(pnode :title))
-     :method ~(/ (* '(+ "GET" "POST" "PATCH")) ,(pnode :method))
+     :method ~(/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
      :url ~(/ (* '(some (if-not "\n" 1))) ,(pnode :url))
      :command '(* :method " " :url :eol)
      :body ~(/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol)) ,(pnode :body))

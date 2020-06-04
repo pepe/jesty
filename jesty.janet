@@ -2,36 +2,33 @@
 (import json)
 (import utf8)
 
-(defn fetch
+(defn fetch-print
   "Simple url fetch. Returns string with the content of the resource."
-  [request]
+  [{:url url :method method :headers headers :body body}]
   (def c (curl/easy/init))
-  (def b (buffer))
-  (def url (request :url))
   (:setopt c
            :url url
-           :write-function (fn [buf] (buffer/push-string b buf))
+           :write-function |(print $)
            :no-progress? true)
-  (when-let [headers (request :headers)]
-    (:setopt c :http-header headers))
-  (case (request :method)
+  (when headers (:setopt c :http-header headers))
+  (case method
     "POST" (:setopt c
                     :post? true
-                    :post-fields (request :body)
-                    :post-field-size (length (request :body)))
+                    :post-fields body
+                    :post-field-size (length body))
     "PATCH" (:setopt c
                      :custom-request "PATCH"
-                     :post-fields (request :body)
-                     :post-field-size (length (request :body)))
+                     :post-fields body
+                     :post-field-size (length body))
     "DELETE" (:setopt c :custom-request "DELETE"))
   (def res (:perform c))
   (when (not (zero? res))
-    (error (string "Cannot fetch: " (curl/easy/strerror res))))
-  b)
+    (error (string "Cannot fetch: " (curl/easy/strerror res)))))
 
 (defn parse-requests [src]
   (var l 1)
   (var ll l)
+  (defn mark-start [] (set ll l))
 
   (defn eol [& _] (++ l))
 
@@ -41,7 +38,7 @@
       (i :header)))
 
   (defn pdefs [& x]
-    (set ll l)
+    (mark-start)
     (collect-headers x))
 
   (defn preq []
@@ -49,7 +46,7 @@
       (def res
         (put (merge {:headers (collect-headers x)
                      :start ll :end (dec l)} ;x) :header nil))
-      (set ll l)
+      (mark-start)
       res))
 
   (defn pnode [tag] (fn [& x] {tag ;x}))
@@ -69,46 +66,11 @@
   (def [defs reqs] (peg/match request-grammar src))
   (map |(update $ :headers array/concat defs) reqs))
 
-(defn print-data [data &opt ind]
-  (default ind 0)
-  (defn indent [] (when (pos? ind) (prin (string/repeat " " ind))))
-  (defn print-table []
-    (when (> ind 1) (print))
-    (indent) (print "{")
-    (eachp [k v] data
-      (indent)
-      (prin "\"" k "\": ")
-      (print-data v (+ 2 ind)))
-    (indent) (print "}"))
-  (defn print-array []
-    (print) (indent) (print "[")
-    (each v data
-      (indent)
-      (print-data v (+ 2 ind)))
-    (indent) (print "]"))
-  (match [(type data) data]
-    [:boolean d] (print d)
-    [:number d] (print d)
-    [:string (d (empty? d))] (print "\"\"")
-    [:string (d (> (length d) 30))] (print (string/slice data 0 30) "...")
-    [:string d] (print d)
-    [:table (d (empty? d))] (print "{}")
-    [:table d] (print-table)
-    [:array (d (empty? d))] (print "[]")
-    [:array d] (print-array)
-    (print "null")))
-
-(defn main [_ &opt i format]
-  (default format "json")
-  (def src (:read stdin :all))
-  (def requests (parse-requests src))
+(defn main [_ &opt i]
+  (def requests (parse-requests (:read stdin :all)))
 
   (if-let [i (and i (scan-number i))]
-    (do
-      (def res (->> requests
-                    (find |(<= ($ :start) i ($ :end)))
-                    (fetch)))
-      (if (= format "pretty")
-        (print-data (json/decode res false true))
-        (print res)))
-    (loop [r :in requests] (tracev r))))
+    (->> requests
+         (find |(<= ($ :start) i ($ :end)))
+         (fetch-print))
+    (loop [r :in requests] (fetch-print r))))

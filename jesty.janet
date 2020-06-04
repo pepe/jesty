@@ -1,6 +1,4 @@
 (import curl)
-(import json)
-(import utf8)
 
 (defn fetch-print
   "Simple url fetch. Returns string with the content of the resource."

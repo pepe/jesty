@@ -1,45 +1,43 @@
 jesty
 ===========
 
-REST client based on text files, simillar to one I was used to use in emacs.
+REST client for text specified requests.
 
-#### Structure of the reqs:
+## Generale
 
-- vars
-  - bearer
-  - url
-- accounts
-  - get
-  - post
-  - patch
-- orders
-  - get
-  - ...
+Jesty uses simple HTTP request specificatin, which is based on actual HTTP
+protocol. It is very simillar to the one emacs http-client plugin uses.
 
-#### File content
+## Request specification format
+
+Just plain text file. I am using http extension so I can have filetype set
+in my editor.
 
 ```
-0: # Patching on url <- comment means request spec start
-1: PATCH @url <- url from variable
+1: # definitions <- keyword for headers (for now) definitions shared by all the specifications in this file
+2: Accept: application/json <- shared header
+3: <- empty line means end of definitions
+4: # Patching on url <- comment means request spec start, and
+5: PATCH https://my.api/products <- url
 #   ^- http verb
-2: Authorization: @bearer <- headers
-   ^- name of the header
-3: Content-Type: @json <- more headers
-4: <- empty line means end of the header and start of the optional body
-5: {
-6:   "price": "bambilion" <- body of the req
-7: }
-8:
-9: # Patching on url with id <- another request spec start
-
-
-
+6: Authorization: Bearer Avsdfasdfasdf <- optional header
+7: Content-Type: application/json <- more headers
+8: <- empty line means end of the header and start of the optional body
+9: {
+10:   "price": "bambilion" <- body of the req
+11: }
+12: <- every request must end with empty line
+13: # Patching on url with id <- another request spec start
+...
 ```
 
-#### Usage:
-`jesty accounts get 0`
+## Usage:
 
-#### Implementation
+`jesty < input.http` will execute all the request specified in the input.http
 
-Simple CLI.
-PEG for the file.
+`jesty < input.http` will execute all the request specified in the input.http
+
+## Installation:
+
+You need Janet programming language installed. Then you can install jesty with
+jpm package manager: `[sudo] jpm install https://github.com/pepe/jesty`.

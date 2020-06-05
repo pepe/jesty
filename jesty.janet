@@ -1,8 +1,12 @@
 (import curl)
 
 (defn fetch-print
-  "Simple url fetch. Returns string with the content of the resource."
+  "Simple url fetch. Prints response to the stdout.
+  Parameter should be table with structure as
+  returned by the parse-requests fn.
+  Throws error when fetch fails"
   [{:url url :method method :headers headers :body body}]
+
   (def c (curl/easy/init))
   (:setopt c
            :url url
@@ -23,7 +27,12 @@
   (when (not (zero? res))
     (error (string "Cannot fetch: " (curl/easy/strerror res)))))
 
-(defn parse-requests [src]
+(defn parse-requests
+  "Parses src string as request specification.
+  Returns array with all the parsed requests
+  as tables."
+  [src]
+
   (var l 1)
   (var ll l)
   (defn mark-start [] (set ll l))
@@ -64,10 +73,19 @@
   (def [defs reqs] (peg/match request-grammar src))
   (map |(update $ :headers array/concat defs) reqs))
 
-(defn main [_ &opt i]
-  (def requests (parse-requests (:read stdin :all)))
+(defn main
+  "Program entry point. If called without params,
+   it parses standart input and execute all
+   requests specified in it.\nIf parameter line
+   is provided, only request specified on this line
+   is executed.\nIf file parameter is given
+   the program reads from the file instead of stdin."
+  [_ &opt line file]
 
-  (if-let [i (and i (scan-number i))]
+  (def src (if file (file/open file) stdin))
+  (def requests (parse-requests (:read src :all)))
+
+  (if-let [i (and line (scan-number line))]
     (->> requests
          (find |(<= ($ :start) i ($ :end)))
          (fetch-print))

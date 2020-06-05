@@ -18,8 +18,7 @@ in my editor.
 2: Accept: application/json <- shared header
 3: <- empty line means end of definitions
 4: # Patching on url <- comment means request spec start, and
-5: PATCH https://my.api/products <- url
-#   ^- http verb
+5: PATCH https://my.api/products <- http verb<space>url
 6: Authorization: Bearer Avsdfasdfasdf <- optional header
 7: Content-Type: application/json <- more headers
 8: <- empty line means end of the header and start of the optional body

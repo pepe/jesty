@@ -3,7 +3,7 @@
 (defn fetch-print
   "Simple url fetch. Prints response to the stdout.
   Parameter should be table with structure as
-  returned by the parse-requests fn.
+  returned by the parse-requests fn.\n
   Throws error when fetch fails"
   [{:url url :method method :headers headers :body body}]
 
@@ -85,8 +85,10 @@
   (def src (if file (file/open file) stdin))
   (def requests (parse-requests (:read src :all)))
 
-  (if-let [i (and line (scan-number line))]
-    (->> requests
-         (find |(<= ($ :start) i ($ :end)))
-         (fetch-print))
+  (if line
+    (if-let [i (scan-number line)]
+      (->> requests
+           (find |(<= ($ :start) i ($ :end)))
+           (fetch-print))
+      (error (string "Line must be a nuber, got: " line)))
     (loop [r :in requests] (fetch-print r))))

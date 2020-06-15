@@ -30,13 +30,16 @@ in my editor.
 ...
 ```
 
+## Installation:
+
+You need latest development version of Janet programming language installed.
+Then you can install jesty with jpm package manager:
+
+`[sudo] jpm install https://github.com/pepe/jesty`.
+
 ## Usage:
 
 `jesty < input.http` will execute all the request specified in the input.http
 
 `jesty < input.http` will execute all the request specified in the input.http
 
-## Installation:
-
-You need Janet programming language installed. Then you can install jesty with
-jpm package manager: `[sudo] jpm install https://github.com/pepe/jesty`.

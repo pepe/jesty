@@ -59,19 +59,20 @@
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
   (def request-grammar
-    ~{:to-nl (some (to "\n"))
-      :eol (drop (cmt '"\n" ,eol))
-      :header (/ (* '(* (some (+ :w "-")) ": " :to-nl) :eol) ,(pnode :header))
-      :definitions (/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
-      :title (/ (* "#" (/ ':to-nl ,string/trim) :eol) ,(pnode :title))
-      :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
-      :url (/ (* ':to-nl) ,(pnode :url))
-      :command (* :method " " :url :eol)
-      :body (/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol)) ,(pnode :body))
-      :request (/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
-      :main (* (? :definitions) (/ (some :request) ,tuple))})
+    (peg/compile
+      ~{:to-nl (some (to "\n"))
+        :eol (drop (cmt '"\n" ,eol))
+        :header (/ (* '(* (some (+ :w "-")) ": " :to-nl) :eol) ,(pnode :header))
+        :definitions (/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
+        :title (/ (* "#" (/ ':to-nl ,string/trim) :eol) ,(pnode :title))
+        :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
+        :url (/ (* ':to-nl) ,(pnode :url))
+        :command (* :method " " :url :eol)
+        :body (/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol)) ,(pnode :body))
+        :request (/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
+        :main (* (? :definitions) (/ (some :request) ,tuple))}))
 
-  (def [defs reqs] (peg/match request-grammar src))
+  (def [defs reqs] (:match request-grammar src))
   (map |(update $ :headers array/concat defs) reqs))
 
 (defn main

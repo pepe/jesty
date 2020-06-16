@@ -30,6 +30,8 @@ in my editor.
 ...
 ```
 
+See the test example in test dir.
+
 ## Installation:
 
 You need latest development version of Janet programming language installed.
@@ -43,4 +45,6 @@ Then you can install jesty with jpm package manager:
 
 `jesty 5 < input.http` will execute the request specified on line 5 in the
 input.http.
+
+My usual tho is just to run buffer from Kakoune.
 

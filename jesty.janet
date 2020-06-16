@@ -35,19 +35,11 @@
 
   (var l 1)
   (var ll l)
+
   (defn mark-start [] (set ll l))
-
   (defn eol [& _] (++ l))
-
-  (defn collect-headers [x]
-    (seq [i :in x
-          :when (i :header)]
-      (i :header)))
-
-  (defn pdefs [& x]
-    (mark-start)
-    (collect-headers x))
-
+  (defn collect-headers [x] (seq [i :in x :when (i :header)] (i :header)))
+  (defn pdefs [& x] (mark-start) (collect-headers x))
   (defn preq []
     (fn [& x]
       (def res
@@ -55,7 +47,6 @@
                      :start ll :end (dec l)} ;x) :header nil))
       (mark-start)
       res))
-
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
   (def request-grammar
@@ -63,25 +54,29 @@
       ~{:to-nl (some (to "\n"))
         :eol (drop (cmt '"\n" ,eol))
         :header (/ (* '(* (some (+ :w "-")) ": " :to-nl) :eol) ,(pnode :header))
-        :definitions (/ (* "# definitions" :eol (some :header) :eol) ,pdefs)
+        :definitions (/ (* "#" :to-nl :eol (some :header) :eol) ,pdefs)
         :title (/ (* "#" (/ ':to-nl ,string/trim) :eol) ,(pnode :title))
         :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
         :url (/ (* ':to-nl) ,(pnode :url))
         :command (* :method " " :url :eol)
-        :body (/ (* :eol (not "#") (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol)) ,(pnode :body))
-        :request (/ (* :title :command (any :header) (any :body) (+ -1 "\n")) ,(preq))
+        :body (/ (* :eol (not "#")
+                    (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol))
+                 ,(pnode :body))
+        :request (/ (* :title :command (any :header) (any :body) (+ -1 "\n"))
+                    ,(preq))
         :main (* (? :definitions) (/ (some :request) ,tuple))}))
 
-  (def [defs reqs] (:match request-grammar src))
-  (map |(update $ :headers array/concat defs) reqs))
+  (let [[defs reqs] (:match request-grammar src)]
+    (map |(update $ :headers array/concat defs) reqs)))
 
 (defn main
   "Program entry point. If called without params,
    it parses standart input and execute all
    requests specified in it.\nIf parameter line
-   is provided, only request specified on this line
-   is executed.\nIf file parameter is given
-   the program reads from the file instead of stdin."
+   is provided, only request containing the specified
+   line is executed.\nIf file parameter is given
+   the program reads from the file instead of stdin.\n
+   Throws error when line is not nunmber."
   [_ &opt line file]
 
   (def src (if file (file/open file) stdin))

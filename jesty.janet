@@ -33,41 +33,34 @@
   as tables."
   [src]
 
-  (var l 1)
-  (var ll l)
-
-  (defn mark-start [] (set ll l))
-  (defn eol [& _] (++ l))
+  (var common-headers [])
   (defn collect-headers [x] (seq [i :in x :when (i :header)] (i :header)))
-  (defn pdefs [& x] (mark-start) (collect-headers x))
+  (defn pdefs [& x] (set common-headers (collect-headers x)))
   (defn preq []
     (fn [& x]
-      (def res
-        (put (merge {:headers (collect-headers x)
-                     :start ll :end (dec l)} ;x) :header nil))
-      (mark-start)
-      res))
+      (-> {:headers (collect-headers x)}
+          (merge ;x)
+          (put :header nil)
+          (update :headers array/concat common-headers))))
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
   (def request-grammar
     (peg/compile
-      ~{:to-nl (some (to "\n"))
-        :eol (drop (cmt '"\n" ,eol))
-        :header (/ (* '(* (some (+ :w "-")) ": " :to-nl) :eol) ,(pnode :header))
-        :definitions (/ (* "#" :to-nl :eol (some :header) :eol) ,pdefs)
-        :title (/ (* "#" (/ ':to-nl ,string/trim) :eol) ,(pnode :title))
+      ~{:eol "\n"
+        :header (* (/ '(* :w (to ":") ": " (to :eol)) ,(pnode :header)) :eol)
+        :definitions (* (/ (* "#" (thru :eol) (some :header)) ,pdefs) :eol)
+        :title (* (/ (line) ,(pnode :start)) (/ (* "#" (/ '(to :eol) ,string/trim) :eol) ,(pnode :title)))
         :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
-        :url (/ (* ':to-nl) ,(pnode :url))
+        :url (/ (* '(to :eol)) ,(pnode :url))
         :command (* :method " " :url :eol)
         :body (/ (* :eol (not "#")
-                    (* '(some (if-not (* "\n" (+ -1 "\n")) (+ :eol 1))) :eol))
+                    '(some (if-not (* "\n" (+ -1 "\n")) 1)))
                  ,(pnode :body))
-        :request (/ (* :title :command (any :header) (any :body) (+ -1 "\n"))
+        :request (/ (* :title :command (any :header) (any :body) (/ (line) ,(pnode :end)) (+ -1 "\n"))
                     ,(preq))
-        :main (* (? :definitions) (/ (some :request) ,tuple))}))
+        :main (* (drop :definitions) (some :request))}))
 
-  (let [[defs reqs] (:match request-grammar src)]
-    (map |(update $ :headers array/concat defs) reqs)))
+  (:match request-grammar src))
 
 (defn main
   "Program entry point. If called without params,

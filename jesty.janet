@@ -1,53 +1,40 @@
-(import curl)
+(import http)
 
 (defn fetch-print
-  "Simple url fetch. Prints response to the stdout.
+  ```
+  Simple url fetch. Prints response to the stdout.
   Parameter should be table with structure as
-  returned by the parse-requests fn.\n
-  Throws error when fetch fails"
+  returned by the parse-requests fn.
+  Throws error when fetch fails
+  ```
   [{:url url :method method :headers headers :body body}]
 
-  (def c (curl/easy/init))
-  (:setopt c
-           :url url
-           :write-function |(print $)
-           :no-progress? true)
-  (when headers (:setopt c :http-header headers))
-  (case method
-    "POST" (:setopt c
-                    :post? true
-                    :post-fields body
-                    :post-field-size (length body))
-    "PATCH" (:setopt c
-                     :custom-request "PATCH"
-                     :post-fields body
-                     :post-field-size (length body))
-    "DELETE" (:setopt c :custom-request "DELETE"))
-  (def res (:perform c))
-  (when (not (zero? res))
-    (error (string "Cannot fetch: " (curl/easy/strerror res)))))
+  (print
+    ((http/request (-> method string/ascii-lower keyword) url
+                   {:headers headers :body body}) :body)))
 
 (defn parse-requests
-  "Parses src string as request specification.
-  Returns array with all the parsed requests
-  as tables."
+  ```
+  Parses src string as request specification.
+  Returns array with all the parsed requests as tables.
+  ```
   [src]
 
   (var common-headers [])
-  (defn collect-headers [x] (seq [i :in x :when (i :header)] (i :header)))
+  (defn collect-headers [x] (merge ;(seq [i :in x :when (i :header)] (i :header))))
   (defn pdefs [& x] (set common-headers (collect-headers x)))
   (defn preq []
     (fn [& x]
       (-> {:headers (collect-headers x)}
           (merge ;x)
           (put :header nil)
-          (update :headers array/concat common-headers))))
+          (update :headers merge common-headers))))
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
   (def request-grammar
     (peg/compile
       ~{:eol "\n"
-        :header (* (/ '(* :w (to ":") ": " (to :eol)) ,(pnode :header)) :eol)
+        :header (* (/ (/ (* '(* :w (to ":")) ": " '(to "\n")) ,struct) ,(pnode :header)) :eol)
         :definitions (* (/ (* "#" (thru :eol) (some :header)) ,pdefs) :eol)
         :title (* (/ (line) ,(pnode :start)) (/ (* "#" (/ '(to :eol) ,string/trim) :eol) ,(pnode :title)))
         :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
@@ -63,17 +50,20 @@
   (:match request-grammar src))
 
 (defn main
-  "Program entry point. If called without params,
-   it parses standart input and execute all
-   requests specified in it.\nIf parameter line
-   is provided, only request containing the specified
-   line is executed.\nIf file parameter is given
-   the program reads from the file instead of stdin.\n
-   Throws error when line is not nunmber."
+  ```
+  Program entry point. If called without params,
+  it parses standart input and execute all
+  requests specified in it. If parameter line is provided,
+  only request containing the specified line is executed.
+  If file parameter is given the program reads from the file
+  instead of stdin.
+  Throws error when line is not nunmber.
+  ```
   [_ &opt line file]
 
-  (def src (if file (file/open file) stdin))
-  (def requests (parse-requests (:read src :all)))
+  (defer (if file (:close file))
+    (def src (if file (file/open file) stdin))
+    (def requests (parse-requests (:read src :all))))
 
   (if line
     (if-let [i (scan-number line)]

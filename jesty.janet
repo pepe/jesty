@@ -10,8 +10,7 @@
   [{:url url :method method :headers headers :body body}]
 
   (print
-    ((http/request (-> method string/ascii-lower keyword) url
-                   {:headers headers :body body}) :body)))
+    ((http/request method url {:headers headers :body body}) :body)))
 
 (defn parse-requests
   ```
@@ -21,7 +20,8 @@
   [src]
 
   (var common-headers [])
-  (defn collect-headers [x] (merge ;(seq [i :in x :when (i :header)] (i :header))))
+  (defn collect-headers [x]
+    (merge ;(seq [i :in x :when (i :header)] (i :header))))
   (defn pdefs [& x] (set common-headers (collect-headers x)))
   (defn preq []
     (fn [& x]
@@ -34,19 +34,21 @@
   (def request-grammar
     (peg/compile
       ~{:eol "\n"
-        :header (* (/ (/ (* '(* :w (to ":")) ": " '(to "\n")) ,struct) ,(pnode :header)) :eol)
+        :header (* (/ (/ (* '(* :w (to ":")) ": " '(to "\n")) ,struct)
+                      ,(pnode :header)) :eol)
         :definitions (* (/ (* "#" (thru :eol) (some :header)) ,pdefs) :eol)
-        :title (* (/ (line) ,(pnode :start)) (/ (* "#" (/ '(to :eol) ,string/trim) :eol) ,(pnode :title)))
+        :title (* (/ (line) ,(pnode :start))
+                  (/ (* "#" (/ '(to :eol) ,string/trim) :eol) ,(pnode :title)))
         :method (/ (* '(+ "GET" "POST" "PATCH" "DELETE")) ,(pnode :method))
         :url (/ (* '(to :eol)) ,(pnode :url))
         :command (* :method " " :url :eol)
         :body (/ (* :eol (not "#")
                     '(some (if-not (* "\n" (+ -1 "\n")) 1)))
                  ,(pnode :body))
-        :request (/ (* :title :command (any :header) (any :body) (/ (line) ,(pnode :end)) (+ -1 "\n"))
+        :request (/ (* :title :command (any :header) (any :body)
+                       (/ (line) ,(pnode :end)) (+ -1 "\n"))
                     ,(preq))
         :main (* (drop :definitions) (some :request))}))
-
   (:match request-grammar src))
 
 (defn main
@@ -61,13 +63,14 @@
   ```
   [_ &opt line file]
 
-  (defer (if file (:close file))
-    (def src (if file (file/open file) stdin))
-    (def requests (parse-requests (:read src :all))))
+  (def requests
+    (defer (if file (:close file))
+      (def src (if file (file/open file) stdin))
+      (parse-requests (:read src :all))))
 
   (if line
     (if-let [i (scan-number line)]
-      (->> requests
+      (->> (tracev requests)
            (find |(<= ($ :start) i ($ :end)))
            (fetch-print))
       (error (string "Line must be a nuber, got: " line)))

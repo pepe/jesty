@@ -23,12 +23,11 @@
   (defn collect-headers [x]
     (merge ;(seq [i :in x :when (i :header)] (i :header))))
   (defn pdefs [& x] (set common-headers (collect-headers x)))
-  (defn preq []
-    (fn [& x]
-      (-> {:headers (collect-headers x)}
-          (merge ;x)
-          (put :header nil)
-          (update :headers merge common-headers))))
+  (defn preq [& x]
+    (-> {:headers (collect-headers (tracev x))}
+        (merge ;x)
+        (put :header nil)
+        (update :headers merge common-headers)))
   (defn pnode [tag] (fn [& x] {tag ;x}))
 
   (def request-grammar
@@ -43,11 +42,12 @@
         :url (/ (* '(to :eol)) ,(pnode :url))
         :command (* :method " " :url :eol)
         :body (/ (* :eol (not "#")
-                    '(some (if-not (* "\n" (+ -1 "\n")) 1)))
+                    '(some (if-not (* :eol (+ -1 :eol)) 1))
+                    :eol)
                  ,(pnode :body))
-        :request (/ (* :title :command (any :header) (any :body)
-                       (/ (line) ,(pnode :end)) (+ -1 "\n"))
-                    ,(preq))
+        :request (/ (* :title :command (any :header) (? :body)
+                       (/ (line) ,(pnode :end)) :eol)
+                    ,preq)
         :main (* (drop :definitions) (some :request))}))
   (:match request-grammar src))
 
@@ -67,11 +67,12 @@
     (defer (if file (:close file))
       (def src (if file (file/open file) stdin))
       (parse-requests (:read src :all))))
+  (tracev (length requests))
 
   (if line
     (if-let [i (scan-number line)]
-      (->> (tracev requests)
+      (->> requests
            (find |(<= ($ :start) i ($ :end)))
-           (fetch-print))
+           fetch-print)
       (error (string "Line must be a nuber, got: " line)))
     (loop [r :in requests] (fetch-print r))))

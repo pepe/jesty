@@ -6,5 +6,4 @@
 (declare-executable
   :name "jesty"
   :entry "jesty.janet"
-  :no-core true
   :install true)

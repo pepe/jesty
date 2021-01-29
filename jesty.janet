@@ -24,7 +24,7 @@
     (merge ;(seq [i :in x :when (i :header)] (i :header))))
   (defn pdefs [& x] (set common-headers (collect-headers x)))
   (defn preq [& x]
-    (-> {:headers (collect-headers (tracev x))}
+    (-> {:headers (collect-headers x)}
         (merge ;x)
         (put :header nil)
         (update :headers merge common-headers)))
@@ -67,7 +67,7 @@
     (defer (if file (:close file))
       (def src (if file (file/open file) stdin))
       (parse-requests (:read src :all))))
-  (tracev (length requests))
+  (length requests)
 
   (if line
     (if-let [i (scan-number line)]
